@@ -1,1 +1,1 @@
-# m1-algo
+# M1 - Projet d'Algorithmique
