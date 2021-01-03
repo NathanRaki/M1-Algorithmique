@@ -1,18 +1,46 @@
 import re
+import nltk
 import pickle
 import pandas as pd
+from nltk.corpus import wordnet
 from objects.author import Author
-from gensim.parsing.preprocessing import remove_stopwords
+from nltk.stem import WordNetLemmatizer
+from gensim.parsing.preprocessing import STOPWORDS
+
+def get_wordnet_pos(word) :
+    tag = nltk.pos_tag([word])[0][1][0].upper()
+    tags = {'J' : wordnet.ADJ,
+            'N' : wordnet.NOUN,
+            'V' : wordnet.VERB,
+            'R' : wordnet.ADV}
+    return tags.get(tag, wordnet.NOUN)
 
 def nettoyer_texte(text):
     result = text.lower()
     result = result.replace('\n', ' ')
-    result = re.sub(r"[0-9,.;@\-\(\)/#?%!:&$]+\ *", " ", result)
-    result = remove_stopwords(result)
+    result = re.sub("www", " ", result)
+    result = re.sub("http", " ", result)
+    result = re.sub(".com", " ", result)
+    result = re.sub(".gg", " ", result)
+    result = re.sub(r"[0-9,.;@\-\(\)/#?%!:|&$]+\ *", " ", result)
+    result = re.sub("\[.*?\]", " " , result)
+    result = re.sub(" +", " ", result)
+    
+    # Removing stopwords
+    stopwords = set()
+    stopwords.update(tuple(nltk.corpus.stopwords.words('english')))
+    all_stopwords = STOPWORDS.union(stopwords)
+    words = result.split()
+    result = [word for word in words if word not in all_stopwords]
+    
+    # Lemmatize text
+    lemmatizer = WordNetLemmatizer()
+    result = [lemmatizer.lemmatize(word, get_wordnet_pos(word)) for word in result]
+    
+    result = ' '.join( [word for word in result if len(word)>1] )
     return result
 
 class Corpus():
-    
     def __init__(self, name):
         self.name = name
         self.collection = {}
@@ -38,13 +66,35 @@ class Corpus():
         freq = {k: v for k, v in sorted(freq.items(), key=lambda item: item[1], reverse=True)}
         top_words = []
         for k,v in freq.items():
-            if len(top_words) < 5:
+            if len(top_words) < 10:
                 top_words.append((k, v))
-        print("### Statistiques du Corpus ###")
-        print("Nombre de mots : %s" % len(freq))
-        print("Mots les plus fréquents :")
+        string = ""
+        string += "### Statistiques du Corpus %s ###\n" % self.name
+        string += "Nombre de mots : %s\n" % len(freq)
+        string += "Mots les plus fréquents :\n"
         for word in top_words:
-            print("\t%s -> %s occurence(s)" % (word[0], str(word[1])))
+            string += "\t%s -> %s occurence(s)\n" % (word[0], str(word[1]))
+        string += "\n"
+        return string
+    
+    def topwords(self):
+        df = pd.DataFrame(columns=["Word", "Count"])
+        
+        self.generate_txt_cache()
+        text = nettoyer_texte(self.txt_cache)
+        freq = {}
+        for word in text.split(" "):
+            if word:
+                freq[word] = freq[word] + 1 if word in freq else 1
+        freq = {k: v for k, v in sorted(freq.items(), key=lambda item: item[1], reverse=True)}
+        top_words = []
+        for k,v in freq.items():
+            if len(top_words) < 10:
+                top_words.append([k, v])
+        for word in top_words:
+            df.loc[len(df)] = word
+        
+        return df.set_index('Word')
         
     def search(self, keyword):
         self.generate_txt_cache()
