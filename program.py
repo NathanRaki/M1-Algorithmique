@@ -150,10 +150,16 @@ class Program():
         self.Labelframe2.configure(background="#d9d9d9")
         self.Labelframe2.configure(relief='groove')
         self.Labelframe2.configure(text='''Parameters''')
+        
+        self.Labelframe2.grid_rowconfigure(0, weight=1)
+        self.Labelframe2.grid_rowconfigure(1, weight=1)
+        self.Labelframe2.grid_rowconfigure(2, weight=1)
+        self.Labelframe2.grid_columnconfigure(0, weight=1)
+        self.Labelframe2.grid_columnconfigure(1, weight=1)
 
         self.Spinbox1 = tk.Spinbox(self.Labelframe2, from_=1.0, to=1000.0)
-        self.Spinbox1.place(relx=0.287, rely=0.64, relheight=0.168
-                , relwidth=0.283, bordermode='ignore')
+        #self.Spinbox1.place(relx=0.287, rely=0.64, relheight=0.168, relwidth=0.283, bordermode='ignore')
+        self.Spinbox1.grid(row=1, column=1, sticky="nsew")
         self.Spinbox1.configure(activebackground="#f9f9f9")
         self.Spinbox1.configure(background="white")
         self.Spinbox1.configure(font="TkDefaultFont")
@@ -162,21 +168,36 @@ class Program():
         self.Spinbox1.configure(selectforeground="white")
 
         self.Entry1 = tk.Entry(self.Labelframe2)
-        self.Entry1.place(relx=0.287, rely=0.4, height=21, relwidth=0.595
-                , bordermode='ignore')
+        #self.Entry1.place(relx=0.287, rely=0.4, height=21, relwidth=0.595, bordermode='ignore')
+        self.Entry1.grid(row=0, column=1, sticky="nsew")
         self.Entry1.configure(background="white")
         self.Entry1.configure(font="TkFixedFont")
+        
+        self.Spinbox2 = tk.Spinbox(self.Labelframe2, from_=1.0, to=1000.0)
+        self.Spinbox2.grid(row=2, column=1, sticky="nsew")
+        self.Spinbox2.configure(activebackground="#f9f9f9")
+        self.Spinbox2.configure(background="white")
+        self.Spinbox2.configure(font="TkDefaultFont")
+        self.Spinbox2.configure(highlightbackground="black")
+        self.Spinbox2.configure(selectbackground="blue")
+        self.Spinbox2.configure(selectforeground="white")
 
         self.Label1 = tk.Label(self.Labelframe2)
-        self.Label1.place(relx=0.036, rely=0.4, height=19, width=66
-                , bordermode='ignore')
+        #self.Label1.place(relx=0.036, rely=0.4, height=19, width=66, bordermode='ignore')
+        self.Label1.grid(row=0, column=0, sticky="nsew")
         self.Label1.configure(text='''Keyword''')
 
         self.Label1_1 = tk.Label(self.Labelframe2)
-        self.Label1_1.place(relx=0.036, rely=0.64, height=19, width=66
-                , bordermode='ignore')
+        #self.Label1_1.place(relx=0.036, rely=0.64, height=19, width=66, bordermode='ignore')
+        self.Label1_1.grid(row=1, column=0, sticky="nsew")
         self.Label1_1.configure(activebackground="#f9f9f9")
         self.Label1_1.configure(text='''Quantity''')
+        
+        self.Label1_2 = tk.Label(self.Labelframe2)
+        #self.Label1_2.place(relx=0.036, rely=0.64, height=19, width=66, bordermode='ignore')
+        self.Label1_2.grid(row=2, column=0, sticky="nsew")
+        self.Label1_2.configure(activebackground="#f9f9f9")
+        self.Label1_2.configure(text='''Top''')
         
         self.Button1 = tk.Button(self.TNotebook1_t1)
         self.Button1.place(relx=0.578, rely=0.152, height=29, width=69)
@@ -228,13 +249,14 @@ class Program():
             self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(background="#000000")
             self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(relief='groove')
             self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(borderwidth="2")
-            self.figures[self.platforms[i]]['df'] = self.corpuses[self.platforms[i]].topwords()
+            self.figures[self.platforms[i]]['df'] = self.corpuses[self.platforms[i]].topwords(int(self.Spinbox2.get()))
             self.figures[self.platforms[i]]['df'].plot(kind='bar', legend=False, ax=self.figures[self.platforms[i]]['ax'])
             self.figures[self.platforms[i]]['ax'].set_xticklabels(self.figures[self.platforms[i]]['ax'].xaxis.get_majorticklabels(), rotation=45, fontsize=9)
             self.figures[self.platforms[i]]['ax'].set_yticks(np.arange(0, max(self.figures[self.platforms[i]]['df']['Count']), round(max(self.figures[self.platforms[i]]['df']['Count'])/10)))
-            self.figures[self.platforms[i]]['ax'].set_title("%s's most frequent words for %s keyword." % (self.platforms[i], self.Entry1.get()))
+            self.figures[self.platforms[i]]['ax'].set_title("%s : %s most used words in %s theme. (Over %s posts)" % (self.platforms[i], self.Spinbox2.get(), self.Entry1.get(), self.Spinbox1.get()))
             self.figures[self.platforms[i]]['fig'].subplots_adjust(bottom=0.2)
             self.figures[self.platforms[i]]['ax'].axes.get_xaxis().set_label_text('')
+            self.figures[self.platforms[i]]['ax'].axes.get_yaxis().set_label_text('Occurrence')
             print(self.figures[self.platforms[i]]['df'])
             
         self.TNotebook1.select(self.TNotebook1_t3)

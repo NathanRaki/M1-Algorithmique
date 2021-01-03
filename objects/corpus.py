@@ -22,7 +22,7 @@ def nettoyer_texte(text):
     result = re.sub("http", " ", result)
     result = re.sub(".com", " ", result)
     result = re.sub(".gg", " ", result)
-    result = re.sub(r"[0-9,.;@\-\(\)/#?%!:|&$]+\ *", " ", result)
+    result = re.sub(r"[0-9,.;@\-\*\(\)/#?%!:|&$]+\ *", " ", result)
     result = re.sub("\[.*?\]", " " , result)
     result = re.sub(" +", " ", result)
     
@@ -77,7 +77,7 @@ class Corpus():
         string += "\n"
         return string
     
-    def topwords(self):
+    def topwords(self, nb):
         df = pd.DataFrame(columns=["Word", "Count"])
         
         self.generate_txt_cache()
@@ -89,7 +89,7 @@ class Corpus():
         freq = {k: v for k, v in sorted(freq.items(), key=lambda item: item[1], reverse=True)}
         top_words = []
         for k,v in freq.items():
-            if len(top_words) < 10:
+            if len(top_words) < nb:
                 top_words.append([k, v])
         for word in top_words:
             df.loc[len(df)] = word
