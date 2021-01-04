@@ -1,10 +1,15 @@
+import time
+import requests
 import scroll
+import pprint
+import pickle
 import tkinter as tk
 import tkinter.ttk as ttk
 
 import praw
 import xmltodict
 import numpy as np
+import pandas as pd
 import urllib.request
 import datetime as dt
 
@@ -21,22 +26,27 @@ def genCorpus(platform, nb, keyword):
             api = praw.Reddit(client_id='EOpJbD-dhnSW6w', client_secret='RGT0E-ceVmPHxyxT9fzPUTSRsg0eJA', user_agent='Reddit WebScraping')
             posts = api.subreddit(keyword).hot(limit=nb)
             for post in posts:
-                datet = dt.datetime.fromtimestamp(post.created)
-                txt = '%s. %s' % (post.title, post.selftext)
-                txt = txt.replace('\n', ' ')
-                txt = txt.replace('\r', ' ')
-                doc = RedditDocument(post.title,
-                               datet,
-                               post.url,
-                               txt,
-                               [post.author_fullname],
-                               post.num_comments)
-                corpus.add_doc(doc)
+                try:
+                    #pprint.pprint(vars(post))
+                    datet = dt.datetime.fromtimestamp(post.created)
+                    txt = '%s. %s' % (post.title, post.selftext)
+                    txt = txt.replace('\n', ' ')
+                    txt = txt.replace('\r', ' ')
+                    doc = RedditDocument(post.title,
+                                   datet,
+                                   post.url,
+                                   txt,
+                                   [post.author_fullname],
+                                   post.num_comments)
+                    corpus.add_doc(doc)
+                except Exception as e:
+                    print('Error: %s' % e)
         elif platform == "arxiv":
             url = "http://export.arxiv.org/api/query?search_query=all:%s&start=0&max_results=%s" % (keyword, str(nb))
             api = urllib.request.urlopen(url).read().decode()
             posts = xmltodict.parse(api)['feed']['entry']
             for post in posts:
+                #pprint.pprint(post)
                 datet = dt.datetime.strptime(post['published'], '%Y-%m-%dT%H:%M:%SZ')
                 try:
                     authors = [aut['name'] for aut in post['author']][0]
@@ -77,7 +87,7 @@ class Program():
         self.top.resizable(1,  1)
         self.top.title("Corpus Analyze")
 
-        self.TCombobox1 = ttk.Combobox(self.top, state="readonly", values=["Term Frequency", "Vocabulary"])
+        self.TCombobox1 = ttk.Combobox(self.top, state="readonly", values=["Term Frequency", "Trending"])
         self.TCombobox1.place(relx=0.351, rely=0.044, relheight=0.043, relwidth=0.295)
         self.TCombobox1.configure(takefocus="")
         self.TCombobox1.current(0)
@@ -217,6 +227,114 @@ class Program():
         self.Output.configure(borderwidth="2")
         self.Output.configure(wrap="none")
         
+    def trGui(self):
+        
+        self.Labelframe1 = tk.LabelFrame(self.TNotebook1_t1)
+        self.Labelframe1.place(relx=0.064, rely=0.076, relheight=0.294
+                , relwidth=0.126)
+        self.Labelframe1.configure(background="#d9d9d9")
+        self.Labelframe1.configure(relief='groove')
+        self.Labelframe1.configure(text='''Select Source''')
+
+        self.reddit = tk.IntVar()
+        self.arxiv = tk.IntVar()
+        self.twitter = tk.IntVar()
+        self.Checkbutton1 = tk.Checkbutton(self.Labelframe1, variable=self.reddit)
+        self.Checkbutton1.place(relx=0.085, rely=0.194, relheight=0.135
+                , relwidth=0.788, bordermode='ignore')
+        self.Checkbutton1.configure(background="#d9d9d9")
+        self.Checkbutton1.configure(activebackground="#e9e9e9")
+        self.Checkbutton1.configure(highlightthickness=0)
+        self.Checkbutton1.configure(justify='left')
+        self.Checkbutton1.configure(text='''Reddit''')
+
+        self.Checkbutton1_1 = tk.Checkbutton(self.Labelframe1, variable=self.arxiv)
+        self.Checkbutton1_1.place(relx=0.085, rely=0.387, relheight=0.135
+                , relwidth=0.788, bordermode='ignore')
+        self.Checkbutton1_1.configure(background="#d9d9d9")
+        self.Checkbutton1_1.configure(activebackground="#e9e9e9")
+        self.Checkbutton1_1.configure(highlightthickness=0)
+        self.Checkbutton1_1.configure(justify='left')
+        self.Checkbutton1_1.configure(text='''Arxiv''')
+
+        self.Checkbutton1_2 = tk.Checkbutton(self.Labelframe1, variable=self.twitter)
+        self.Checkbutton1_2.place(relx=0.085, rely=0.581, relheight=0.135
+                , relwidth=0.788, bordermode='ignore')
+        self.Checkbutton1_2.configure(background="#d9d9d9")
+        self.Checkbutton1_2.configure(activebackground="#e9e9e9")
+        self.Checkbutton1_2.configure(highlightthickness=0)
+        self.Checkbutton1_2.configure(justify='left')
+        self.Checkbutton1_2.configure(text='''Twitter''')
+        
+        self.Labelframe2 = tk.LabelFrame(self.TNotebook1_t1)
+        self.Labelframe2.place(relx=0.5, rely=0.002, relheight=0.996, relwidth=0.4)
+        self.Labelframe2.configure(background="#d9d9d9")
+        self.Labelframe2.configure(relief='groove')
+        self.Labelframe2.configure(text='''Parameters''')
+        
+        
+        self.Entry1 = tk.Entry(self.Labelframe2)
+        self.Entry1.configure(background="white")
+        self.Entry1.configure(font="TkFixedFont")
+        self.Entry1.pack()
+        
+        self.Button2 = tk.Button(self.Labelframe2)
+        self.Button2.configure(text='''Plots''')
+        self.Button2.configure(command=self.timeplots)
+        self.Button2.pack()
+        
+        self.Button1 = tk.Button(self.Labelframe2)
+        self.Button1.configure(text='''Generate''')
+        self.Button1.configure(command=self.timestudy)
+        self.Button1.pack()
+        
+    def timeplots(self):
+        self.destroyResults()
+        self.platforms = list()
+        coords = [(0,0), (0,1), (1,0), (1,1)]
+        if self.reddit.get():
+            self.platforms.append("reddit")
+        if self.arxiv.get():
+            self.platforms.append("arxiv")
+        if self.twitter.get():
+            self.platforms.append("twitter")
+            
+        self.PlotFrame = tk.LabelFrame(self.TNotebook1_t3)
+        self.PlotFrame.place(relx=0.002, rely=0.002, relheight=0.996, relwidth=0.996)
+        self.PlotFrame.configure(background="#d9d9d9")
+        self.PlotFrame.configure(relief='groove')
+        self.PlotFrame.configure(text='''Graphs''')
+        self.PlotFrame.grid_rowconfigure(0, weight=1)
+        self.PlotFrame.grid_columnconfigure(0, weight=1)
+        
+        for i in range(len(self.platforms)):
+            self.PlotFrame.grid_rowconfigure(coords[i][0], weight=1)
+            self.PlotFrame.grid_columnconfigure(coords[i][1], weight=1)
+            self.figures[self.platforms[i]] = dict()
+            self.figures[self.platforms[i]]['fig'] = plt.Figure(figsize=(6,5), dpi=100)
+            self.figures[self.platforms[i]]['ax'] = self.figures[self.platforms[i]]['fig'].add_subplot(111)
+            self.figures[self.platforms[i]]['widget'] = FigureCanvasTkAgg(self.figures[self.platforms[i]]['fig'], self.PlotFrame)
+            self.figures[self.platforms[i]]['widget'].get_tk_widget().grid(row=coords[i][0], column=coords[i][1], sticky="nsew")
+            self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(background="#000000")
+            self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(relief='groove')
+            self.figures[self.platforms[i]]['widget'].get_tk_widget().configure(borderwidth="2")
+            self.figures[self.platforms[i]]['ax'].set_title("%s Subreddit Trend" % "Coronavirus")
+            self.figures[self.platforms[i]]['ax'].axes.get_xaxis().set_label_text('')
+        
+            with open('reddit.pickle', 'rb') as handle:
+                df = pickle.load(handle)
+                
+            print(df)
+                
+            df['created_utc'] = pd.to_datetime(df['created_utc'], unit='s').dt.strftime("%d-%m-%Y")
+            df = df.groupby('created_utc').count()
+            df.index = pd.to_datetime(df.index, format="%d-%m-%Y")
+            df = df.sort_index()
+            print(df)
+            df.plot(legend=False, ax=self.figures[self.platforms[i]]['ax'])
+            
+        self.TNotebook1.select(self.TNotebook1_t3)
+        
     def generate(self):
         self.destroyResults()
         self.platforms = list()
@@ -260,10 +378,52 @@ class Program():
             print(self.figures[self.platforms[i]]['df'])
             
         self.TNotebook1.select(self.TNotebook1_t3)
+        
+    # github.com/Watchful1/Sketchpad/blob/master/postDownloader.py
+    def timestudy(self):
+        url = "https://api.pushshift.io/reddit/{}/search?limit=1000&lang=en&sort=desc&subreddit={}&before="
+        start = round(time.time())
+        
+        count = 0
+        prevtime = start
+        df = pd.DataFrame(columns=['title', 'created_utc'])
+        while True:
+            try:
+                new_url = url.format("submission", "Coronavirus") + str(prevtime)
+                json = requests.get(new_url)
+                #time.sleep(1)
+                json_data = json.json()
+            except Exception as e:
+                print("Error: %s" % e)
+                continue
+            if 'data' not in json_data:
+                break
+            objects = json_data['data']
+            if len(objects) == 0:
+                break
+            
+            for object in objects:
+                prevtime = object['created_utc'] - 1
+                count += 1
+                df.loc[len(df)] = [object['title'], object['created_utc']]
+            
+            print(count)
+            if count>10000:
+                break
+            
+        with open("reddit.pickle", "wb") as handle:
+            pickle.dump(df, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            
+        print(df.head())
+        print(df.shape)
+        
 
     def refresh(self):
         if self.state == "Term Frequency" and not self.loaded:
             self.tfGui()
+            self.loaded = True
+        elif self.state == "Trending" and not self.loaded:
+            self.trGui()
             self.loaded = True
         
     def destroyResults(self):
@@ -281,6 +441,10 @@ class Program():
             self.Labelframe2.destroy()
             self.Button1.destroy()
             self.Output.delete('1.0', tk.END)
+        if self.state == "Trending":
+            self.Entry1.destroy()
+            self.Button1.destroy()
+            self.Button2.destroy()
             
     def start(self):
         while True:
