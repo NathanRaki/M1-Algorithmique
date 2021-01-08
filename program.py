@@ -342,8 +342,8 @@ class Program():
         
         self.tk_button_reddit_plot = tk.Button(self.tk_frame_plotting, width=10)
         self.tk_button_reddit_plot.grid(row=1, column=2, sticky="nsew", padx=5, pady=(5,15))
-        self.tk_button_reddit_plot.configure(text="Generate")
-        #self.tk_button_reddit_plot.configure(command=(lambda: self.gen_trend("reddit")))
+        self.tk_button_reddit_plot.configure(text="Plot")
+        self.tk_button_reddit_plot.configure(command=(lambda: self.timeplots()))
         
         self.tk_label_arxiv_plot = tk.Label(self.tk_frame_plotting)
         self.tk_label_arxiv_plot.grid(row=2, column=0, columnspan=3, sticky="nsew")
@@ -414,36 +414,47 @@ class Program():
     
     def timeplots(self):
         self.prepareResults()
-        if len(self.platforms) == 0:
-            self.tk_label_warning.configure(text="Please select at least one platform to plot from.")
-            return
-        for i in range(len(self.platforms)):
+        platforms = []
+        keyword = dict()
+        if self.tk_combobox_reddit_topic.get():
+            platforms.append("reddit")
+            keyword["reddit"] = self.tk_combobox_reddit_topic.get()
+        if self.tk_combobox_arxiv_topic.get():
+            platforms.append("arxiv")
+            keyword["arxiv"] = self.tk_combobox_arxiv_topic.get()
+        if self.tk_combobox_twitter_topic.get():
+            platforms.append("twitter")
+            keyword["twitter"] = self.tk_combobox_twitter_topic.get()
+            
+        for i in range(len(platforms)):
             self.PlotFrame.grid_rowconfigure(self.plotcoords[i][0], weight=1)
             self.PlotFrame.grid_columnconfigure(self.plotcoords[i][1], weight=1)
-            self.plots[self.platforms[i]] = dict()
-            self.plots[self.platforms[i]]['fig'] = plt.Figure(figsize=(6,5), dpi=100)
-            self.plots[self.platforms[i]]['ax'] = self.plots[self.platforms[i]]['fig'].add_subplot(111)
-            self.plots[self.platforms[i]]['widget'] = FigureCanvasTkAgg(self.plots[self.platforms[i]]['fig'], self.PlotFrame)
-            self.plots[self.platforms[i]]['widget'].get_tk_widget().grid(row=self.plotcoords[i][0], column=self.plotcoords[i][1], sticky="nsew")
-            self.plots[self.platforms[i]]['widget'].get_tk_widget().configure(background="#000000")
-            self.plots[self.platforms[i]]['widget'].get_tk_widget().configure(relief='groove')
-            self.plots[self.platforms[i]]['widget'].get_tk_widget().configure(borderwidth="2")
-            self.plots[self.platforms[i]]['ax'].set_title("%s Subreddit Trend" % self.tk_entry_keyword.get())
-            self.plots[self.platforms[i]]['ax'].axes.get_xaxis().set_label_text('')
+            self.plots[platforms[i]] = dict()
+            self.plots[platforms[i]]['fig'] = plt.Figure(figsize=(6,5), dpi=100)
+            self.plots[platforms[i]]['ax'] = self.plots[platforms[i]]['fig'].add_subplot(111)
+            self.plots[platforms[i]]['widget'] = FigureCanvasTkAgg(self.plots[platforms[i]]['fig'], self.PlotFrame)
+            self.plots[platforms[i]]['widget'].get_tk_widget().grid(row=self.plotcoords[i][0], column=self.plotcoords[i][1], sticky="nsew")
+            self.plots[platforms[i]]['widget'].get_tk_widget().configure(background="#000000")
+            self.plots[platforms[i]]['widget'].get_tk_widget().configure(relief='groove')
+            self.plots[platforms[i]]['widget'].get_tk_widget().configure(borderwidth="2")
+            self.plots[platforms[i]]['ax'].set_title("%s Subreddit Trend" % keyword[platforms[i]])
+            self.plots[platforms[i]]['ax'].axes.get_xaxis().set_label_text('')
             
             try:
-                with open('%s-%s.pickle' % (self.platforms[i], self.tk_entry_keyword.get().lower()), 'rb') as handle:
+                with open('saved/%s/%s.pickle' % (platforms[i], keyword[platforms[i]].lower()), 'rb') as handle:
                     df = pickle.load(handle)
             except Exception as e:
                 print(e)
                 self.tk_label_warning.configure(text="File not found, please use generate button with this keyword to import data from API.")
                 return
 
-            df['created_utc'] = pd.to_datetime(df['created_utc'], unit='s').dt.strftime("%d-%m-%Y")
+
+            df['created_utc'] = pd.to_datetime(df['created_utc'], unit='s').dt.strftime("%H %d-%m-%Y")
             df = df.groupby('created_utc').count()
-            df.index = pd.to_datetime(df.index, format="%d-%m-%Y")
+            df.index = pd.to_datetime(df.index, format="%H %d-%m-%Y")
             df = df.sort_index()
-            df.plot(legend=False, ax=self.plots[self.platforms[i]]['ax'])
+            df.plot(legend=False, ax=self.plots[platforms[i]]['ax'])
+            print(df)
             
         self.tk_notebook.select(self.tk_notebook_results)
         
