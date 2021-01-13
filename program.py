@@ -6,7 +6,6 @@ import requests
 import tkinter as tk
 import tkinter.ttk as ttk
 from matplotlib.ticker import MaxNLocator
-import matplotlib.dates as mdates
 
 import threading
 
@@ -22,6 +21,10 @@ import nltk
 from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from gensim.parsing.preprocessing import STOPWORDS
+
+progress_reddit_value = 0
+progress_arxiv_value = 0
+to_update = False
 
 def get_wordnet_pos(word) :
     tag = nltk.pos_tag([word])[0][1][0].upper()
@@ -56,8 +59,8 @@ def nettoyer_texte(text):
     result = ' '.join( [word for word in result if len(word)>1] )
     return result
 
-def create_pickle(self, platform, keyword, number):
-    
+def create_pickle(platform, keyword, number):
+    global progress_reddit_value, progress_arxiv_value, to_update
     count = 0
     number = int(number)
     keyword = keyword.lower()
@@ -95,10 +98,8 @@ def create_pickle(self, platform, keyword, number):
                     continue
                 if count == number:
                     break
-            self.progress_reddit_value = (count / number) * 100
-            self.to_update = True
-        self.progress_reddit_value = 100
-        self.to_update = True
+            progress_reddit_value = int((count / number) * 100)
+            to_update = True
             
     elif platform == "arxiv":
         url = "http://export.arxiv.org/api/query?search_query=all:{}&start={}&max_results={}"
@@ -106,7 +107,7 @@ def create_pickle(self, platform, keyword, number):
             if count >= number:
                 break
             try:
-                new_url = url.format(keyword, str(count), str(count+2000))
+                new_url = url.format(keyword, str(count), "200")
                 data = urllib.request.urlopen(new_url).read().decode()
                 docs = xmltodict.parse(data)['feed']['entry']
             except Exception as e:
@@ -124,16 +125,14 @@ def create_pickle(self, platform, keyword, number):
                 count += 1
                 if count == number:
                     break
-            self.progress_arxiv_value = (count / number) * 100
-            self.to_update = True
-        self.progress_arxiv_value = 100
-        self.to_update = True
+            progress_arxiv_value = int((count / number) * 100)
+            to_update = True
     
     mindate = (dt.datetime(2017,1,1) - dt.datetime(1970,1,1)).total_seconds()
     df = df[~(df['date'] < mindate)]
     with open("saved/%s/%s-%s.pickle" % (platform, keyword.lower(), str(count)), "wb") as handle:
         pickle.dump(df, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    self.reload_saves()
+    to_update = True
 
 class Program():
     
@@ -144,10 +143,6 @@ class Program():
         self.plotcoords = [(0,0), (0,1), (1,0), (1,1)]
         
         self.create_pickle = create_pickle
-        
-        self.progress_reddit_value = 0
-        self.progress_arxiv_value = 0
-        self.to_update = False
         
         self.threads = dict()
         self.saves = dict()
@@ -383,7 +378,17 @@ class Program():
         self.reload_saves()
         
     def thread_func(self, func, *args):
-        self.threads[args[0]] = threading.Thread(target=self.create_pickle, args=(self,)+args)
+        if args[0] == "reddit":
+            self.progress_reddit['value'] = 0
+            self.progress_reddit.configure(style="red.Horizontal.TProgressbar")
+            self.tk_button_reddit_generate.config(text="Generating...")
+            self.tk_button_reddit_generate['state'] = 'disabled'
+        elif args[0] == "arxiv":
+            self.progress_arxiv['value'] = 0
+            self.progress_arxiv.configure(style="red.Horizontal.TProgressbar")
+            self.tk_button_arxiv_generate.config(text="Generating...")
+            self.tk_button_arxiv_generate['state'] = 'disabled'
+        self.threads[args[0]] = threading.Thread(target=create_pickle, args=args)
         self.threads[args[0]].start()
         
     def reload_saves(self):
@@ -391,10 +396,14 @@ class Program():
         self.saves["arxiv"] = [""]
         for filename in os.scandir("./saved/reddit"):
             self.saves["reddit"].append(re.sub(".pickle", "", filename.name))
-            self.tk_combobox_reddit_topic.configure(values=self.saves["reddit"])
+            if hasattr(self, 'tk_combobox_reddit_topic'):
+                if self.tk_combobox_reddit_topic.winfo_exists():
+                    self.tk_combobox_reddit_topic.configure(values=self.saves["reddit"])
         for filename in os.scandir("./saved/arxiv"):
             self.saves["arxiv"].append(re.sub(".pickle", "", filename.name))
-            self.tk_combobox_arxiv_topic.configure(values=self.saves["arxiv"])
+            if hasattr(self, 'tk_combobox_reddit_topic'):
+                if self.tk_combobox_arxiv_topic.winfo_exists():
+                    self.tk_combobox_arxiv_topic.configure(values=self.saves["arxiv"])
         
     def MUWPlot(self):
         self.prepareResults()
@@ -483,12 +492,9 @@ class Program():
             self.plots[platform]['df'] = self.TT(platform, keyword)
             self.plots[platform]['df'].plot(legend=False, ax=self.plots[platform]['ax'])
             
-            
+            self.plots[platform]['ax'].tick_params(axis='x', rotation=45)
             self.plots[platform]['ax'].set_title("%s Subreddit Trend" % keyword)
             self.plots[platform]['ax'].axes.get_xaxis().set_label_text('')
-            
-            self.plots[platform]['ax'].xaxis.set_major_formatter(mdates.DateFormatter("%m-%Y"))
-            self.plots[platform]['ax'].xaxis.set_minor_formatter(mdates.DateFormatter("%d-%m-%Y"))
         self.tk_notebook.select(self.tk_notebook_results)
         
     def TT(self, platform, keyword):
@@ -502,12 +508,10 @@ class Program():
         date_format = "%m-%Y"
         date = pd.to_datetime(df['date'], unit='s').dt.strftime(date_format)
         if len(date.drop_duplicates()) <= 2:
-            print("YES")
             date_format = "%d-%m-%Y"
             date = pd.to_datetime(df['date'], unit='s').dt.strftime(date_format)
         df['date'] = date
         df = df.groupby('date').count()
-        print(date_format)
         df.index = pd.to_datetime(df.index, format=date_format)
         df = df.sort_index()
         return df
@@ -554,6 +558,8 @@ class Program():
                 break
             
     def refresh(self):
+        global progress_reddit_value, progress_arxiv_value, to_update
+        
         if self.state == "Generate" and not self.loaded:
             self.GenerateGUI()
             self.loaded = True
@@ -564,31 +570,33 @@ class Program():
             self.TopicTrendingGUI()
             self.loaded = True
             
-        if self.state == "Generate":
+        if self.state == "Generate" and to_update:
+            print('Updating GUI...')
             if "reddit" in self.threads:
+                print('Reddit')
                 if self.threads["reddit"].is_alive():
-                    self.progress_reddit.configure(style="red.Horizontal.TProgressbar")
-                    self.tk_button_reddit_generate.config(text="Generating...")
-                    self.tk_button_reddit_generate['state'] = 'disabled'
+                    print('Alive : %s' % str(progress_reddit_value))
+                    self.progress_reddit['value'] = progress_reddit_value
                 else:
+                    print('Dead')
+                    self.progress_reddit['value'] = 100
                     self.progress_reddit.configure(style="green.Horizontal.TProgressbar")
                     self.tk_button_reddit_generate.config(text="Generate")
                     self.tk_button_reddit_generate['state'] = 'normal'
+                    self.reload_saves()
             if "arxiv" in self.threads:
+                print('Arxiv')
                 if self.threads["arxiv"].is_alive():
-                    self.progress_arxiv.configure(style="red.Horizontal.TProgressbar")
-                    self.tk_button_arxiv_generate.config(text="Generating...")
-                    self.tk_button_arxiv_generate['state'] = 'disabled'
+                    print('Alive : %s' % str(progress_arxiv_value))
+                    self.progress_arxiv['value'] = progress_arxiv_value
                 else:
+                    print('Dead')
+                    self.progress_arxiv['value'] = 100
                     self.progress_arxiv.configure(style="green.Horizontal.TProgressbar")
                     self.tk_button_arxiv_generate.config(text="Generate")
                     self.tk_button_arxiv_generate['state'] = 'normal'
-            
-        
-        if self.to_update:
-            self.progress_reddit['value'] = self.progress_reddit_value
-            self.progress_arxiv['value'] = self.progress_arxiv_value
-            self.to_update = False
+                    self.reload_saves()
+            to_update = False
 
 
 if __name__ == '__main__':
