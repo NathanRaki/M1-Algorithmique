@@ -12,7 +12,6 @@ import urllib.request
 import datetime as dt
 import tkinter.ttk as ttk
 import matplotlib.pyplot as plt
-from nltk.stem import WordNetLemmatizer
 from matplotlib.ticker import MaxNLocator
 from gensim.parsing.preprocessing import STOPWORDS
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -585,7 +584,7 @@ class Program():
                 self.tk_button_plot['state'] = 'normal'
                 to_plot = False
                 
-# Used to clean a string: remove special chars, stopwords and lemmatize words
+# Used to clean a string: remove special chars, stopwords
 def nettoyer_texte(text):
     # Replacing specials chars and specific strings like "http"
     result = text.lower()
@@ -604,10 +603,6 @@ def nettoyer_texte(text):
     all_stopwords = STOPWORDS.union(stopwords)
     words = result.split()
     result = [word for word in words if word not in all_stopwords]
-    
-    # Lemmatize text
-    lemmatizer = WordNetLemmatizer()
-    result = [lemmatizer.lemmatize(word) for word in result]
     
     result = ' '.join( [word for word in result if len(word)>1] )
     return result
